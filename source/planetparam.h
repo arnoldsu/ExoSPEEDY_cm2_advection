@@ -1,0 +1,20 @@
+C--IO planet parameters and variable type declarations
+      INTEGER     MAXMON
+      PARAMETER  (MAXMON=32)
+      REAL        WINTER
+      INTEGER     MONTHS, DAYSYR, MINSDY, MINSHR,
+     &            SECSDY, SECSHR, NVE, DAYRAD
+      INTEGER     DAYSMN(MAXMON)
+      CHARACTER*4 LBLMON(MAXMON)
+      REAL        GRAVIT, REARTH, OMEGA, AKAP, RGAS, ECC, OBLIQ
+      REAL        OMDEG, GRMAX, HCAPSO, HCAPIC, HCAPSE
+      REAL        FRWTR, TGRVWV, SDEP1
+      REAL        TTROP, TSTRAT, PREF
+      INTEGER     IDEP2, NPOWHD
+      INTEGER     MAXLEV
+      PARAMETER  (MAXLEV=20)
+      INTEGER     NPLEVS
+      REAL        PLEV(MAXLEV)
+      REAL        ESREF, WTRAIR
+      REAL        ARMFAC, ARMC1, ARMC2, ARMT1, ARMT2, BARLPS, WREF
+      REAL        MINST, MAXST, ANOM0

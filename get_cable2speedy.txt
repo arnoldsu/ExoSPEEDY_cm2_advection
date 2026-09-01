@@ -1,0 +1,117 @@
+CABLE-to-ExoSPEEDY coupling plan
+================================
+
+CABLE cannot be added by simply calling its offline executable:
+cable_driver.F90 is a standalone program that reads forcing files. The
+practical route is to embed CABLE's land-process routines--centred on cbm in
+cbl_model_driver_offline.F90--behind ExoSPEEDY's existing land interface.
+
+1. Establish a baseline
+
+   Run an unmodified ExoSPEEDY experiment and retain its outputs. Also run
+   CABLE offline for a compatible land point/data set. These become the
+   reference tests for every coupling change.
+
+2. Choose the coupling scope
+
+   Start with land only: CABLE replaces ExoSPEEDY's slab-land model, while
+   ExoSPEEDY keeps its atmosphere and sea/ice model. Do not alter the ocean
+   interface initially.
+
+3. Use ExoSPEEDY's existing coupling boundary
+
+   ExoSPEEDY already has a land interface:
+
+       atmosphere -> ATM2LAND -> land model -> LAND2ATM -> atmosphere
+
+   It is implemented mainly in source/cpl_land.f,
+   source/cpl_land_model.f, and source/cpl_main_interface.f. The current
+   land model only evolves land-surface temperature from the daily net heat
+   flux. CABLE should replace this simple land component, not be bolted onto
+   the end of it.
+
+4. Create a small CABLE wrapper
+
+   Add a new Fortran module, for example source/cable_speedy_interface.F90,
+   with three routines:
+
+       call cable_speedy_init(...)
+       call cable_speedy_step(dt, forcing, state, fluxes)
+       call cable_speedy_restart(mode, ...)
+
+   This wrapper owns CABLE's state variables, calls the CABLE initialization
+   routines once, and calls CABLE's cbm land step each atmosphere timestep.
+   Keep CABLE's PROGRAM cable_offline_driver out of the linked model.
+
+5. Map the grids and land parameters
+
+   ExoSPEEDY uses its ngp grid, while the CABLE offline case is driven from
+   NetCDF inputs. Create CABLE-ready fields on the ExoSPEEDY grid:
+
+   - land fraction, latitude/longitude
+   - soil texture/depth and hydraulic parameters
+   - vegetation/PFT fractions, LAI and canopy height
+   - terrain and surface albedo parameters
+   - initial soil temperature, moisture, snow, and canopy states
+
+   For a first test, use one PFT and simple soil properties. Add realistic
+   global parameter datasets only after the interface works.
+
+6. Send atmospheric forcing from SPEEDY to CABLE
+
+   At each physics timestep, provide CABLE with at least:
+
+   - near-surface air temperature, humidity, wind, and pressure
+   - incoming shortwave and longwave radiation
+   - rainfall and snowfall
+   - atmospheric CO2
+   - timestep and calendar information
+
+   CABLE's offline meteorology-file read must be bypassed for this coupled
+   path; fields come directly from ExoSPEEDY arrays instead.
+
+7. Return CABLE's prognostic surface state to SPEEDY
+
+   Initially, replace the fields set in LAND2ATM:
+
+       stl_am(:)   ! land-surface temperature
+       snowd_am(:) ! snow water equivalent/depth
+       soilw_am(:) ! plant-available soil water
+
+   These are currently assigned from climatology in source/cpl_land.f.
+
+8. Complete the two-way flux coupling
+
+   This is the scientifically important part. ExoSPEEDY currently computes
+   and accumulates its own land fluxes--precipitation, evaporation, sensible
+   heat, latent heat, and net heat--in source/ppo_dmflux.f.
+
+   Replace or modify its land surface physics so that CABLE supplies
+   consistent:
+
+   - sensible and latent heat flux
+   - evaporation/transpiration
+   - surface albedo and emitted longwave radiation
+   - roughness / transfer coefficients where required
+   - runoff, snow, soil-water stress, and surface temperature
+
+   Be careful with signs and units: ExoSPEEDY defines land heat fluxes as
+   downward except evaporation (source/com_flx_land.h). Document a conversion
+   table and test it.
+
+9. Add restarts, diagnostics, and tests
+
+   Extend REST_LAND to save and restore the full CABLE soil, snow, canopy,
+   and vegetation state--not merely stl_lm. Then validate:
+
+   - water, energy, and carbon conservation
+   - a single-grid-cell test against standalone CABLE
+   - prescribed-forcing global test
+   - fully interactive climate run
+   - restart reproducibility
+
+A sensible implementation sequence is: CABLE initialization -> CABLE surface
+temperature/soil moisture -> snow -> flux replacement -> restart/output ->
+global parameter realism. The first usable milestone is CABLE providing
+stl_am, snowd_am, and soilw_am; the full two-way flux exchange is the actual
+coupled model.

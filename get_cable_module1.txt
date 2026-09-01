@@ -1,0 +1,76 @@
+Modular CABLE-to-ExoSPEEDY coupling design
+==========================================
+
+Use a component API, not an embedded/hardwired CABLE implementation.
+
+Recommended structure:
+
+    ExoSPEEDY
+       |
+       | generic land-component interface
+       v
+    CABLE adapter
+       |
+       | stable C/Fortran API
+       v
+    libcable_component.a
+       |
+       v
+    CABLE internals
+
+Keep CABLE in its own checkout and build it as a library. Add only a small
+wrapper, for example cable_component_api.F90, that exposes:
+
+    call cable_init(config, grid, surface_parameters, state)
+    call cable_advance(dt, atmospheric_forcing, state, fluxes)
+    call cable_get_surface(state, surface_fields)
+    call cable_restart(mode, state)
+    call cable_finalize()
+
+The wrapper translates between simple exchange arrays and CABLE's internal
+derived types/modules. CABLE remains responsible for soil, vegetation, snow,
+and energy/water calculations; it must not read a meteorological NetCDF file
+when coupled.
+
+In ExoSPEEDY, make its land code depend only on a generic interface:
+
+    call land_init(...)
+    call land_advance(dt, forcing, state, fluxes)
+    call land_get_surface(...)
+
+Then provide two interchangeable backends:
+
+  - speedy_land_backend: the current slab-land implementation
+  - cable_land_backend: calls the CABLE API
+
+A runtime setting such as land_backend = "cable" selects CABLE. ExoSPEEDY's
+atmospheric code only sees surface temperature, snow, soil-water availability,
+albedo, and heat/water fluxes--not CABLE types or source files.
+
+Keep configuration separate:
+
+    ExoSPEEDY run configuration  -> selects backend and coupling timestep
+    CABLE component configuration -> PFT, soil, switches, parameters
+    Exchange contract             -> units, signs, fields, dimensions
+
+The exchange contract should specify:
+
+    SPEEDY -> CABLE: air temperature, humidity, wind, pressure,
+                      shortwave/longwave radiation, rain, snow, CO2, dt
+
+    CABLE -> SPEEDY: surface temperature, albedo, snow, soil moisture,
+                      sensible heat, latent heat, evaporation, runoff,
+                      roughness / drag coefficients
+
+Use the same land grid initially. If grids differ, put regridding in a
+separate coupler layer--not inside CABLE or ExoSPEEDY.
+
+For this codebase, the minimal ExoSPEEDY change is to replace the
+implementation behind ATM2LAND / LAND2ATM in source/cpl_land.f; do not modify
+the atmospheric physics to reference CABLE modules directly. Build the CABLE
+wrapper as libcable_component.a, then link it from ExoSPEEDY's makefile.
+
+First implementation stage:
+
+Define the exchange interface and add a CABLE library wrapper plus an
+ExoSPEEDY adapter skeleton, while retaining the current slab-land backend.

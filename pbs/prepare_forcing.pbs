@@ -1,0 +1,19 @@
+#!/bin/bash -l
+#PBS -S /bin/bash
+#PBS -P p66
+#PBS -W umask=002
+#PBS -q normal
+#PBS -l walltime=04:00:00
+#PBS -l mem=64GB
+#PBS -l ncpus=8
+#PBS -l jobfs=64GB
+#PBS -l storage=gdata/p66+gdata/fs38+scratch/p66
+#PBS -l wd
+#PBS -N cm2_qadv
+set -euo pipefail
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3-26.01
+cd "$PBS_O_WORKDIR"
+python cm2_advection_forcing/prepare_cm2_advection.py
+

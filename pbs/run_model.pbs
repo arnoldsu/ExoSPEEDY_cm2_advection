@@ -1,0 +1,25 @@
+#!/bin/bash -l
+#PBS -S /bin/bash
+#PBS -P p66
+#PBS -W umask=002
+#PBS -q normal
+#PBS -l walltime=24:00:00
+#PBS -l mem=64GB
+#PBS -l ncpus=8
+#PBS -l jobfs=64GB
+#PBS -l storage=gdata/p66+gdata/fs38+scratch/p66
+#PBS -l wd
+#PBS -N exosp_cm2
+set -euo pipefail
+module purge
+module load intel-compiler/2021.10.0
+export F_UFMTENDIAN=big
+cd "$PBS_O_WORKDIR/run"
+printf 'n\nn\nn\nn\nn\nn\nn\n' | sh run_exp.s t30 107 0
+test -s ../output/exp_107/atgcm107.rst
+grep -q 'Write restart dataset for year/month:' ../output/exp_107/atgcm107.lis
+cd "$PBS_O_WORKDIR"
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3-26.01
+./convert_output_to_netcdf.sh output/exp_107
